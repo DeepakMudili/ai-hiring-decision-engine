@@ -44,8 +44,9 @@ Return ONLY valid JSON in this exact format:
 
 Rules:
 - score must be from 0 to 50
-- matched_skills must be relevant skills found in the resume
+- matched_skills must be relevant skills clearly found in the resume
 - missing_skills must be important job skills missing from the resume
+- never include the same skill in both matched_skills and missing_skills
 - feedback must be short and professional
 - no markdown
 - no extra text
@@ -81,6 +82,7 @@ def verify_password(password, hashed_password):
 
 def extract_pdf_text(file_bytes):
     doc = fitz.open(stream=file_bytes, filetype="pdf")
+
     text = ""
 
     for page in doc:
@@ -111,6 +113,40 @@ def extract_json_from_text(text):
 
 
 # =========================
+# SKILL CLEANUP
+# =========================
+
+def clean_skill_list(skills):
+    if not isinstance(skills, list):
+        return []
+
+    cleaned = []
+
+    for skill in skills:
+        if not isinstance(skill, str):
+            continue
+
+        skill = skill.strip()
+
+        if skill and skill.lower() not in [s.lower() for s in cleaned]:
+            cleaned.append(skill)
+
+    return cleaned
+
+
+def remove_duplicate_missing_skills(matched_skills, missing_skills):
+    matched_lower = [skill.lower() for skill in matched_skills]
+
+    cleaned_missing = []
+
+    for skill in missing_skills:
+        if skill.lower() not in matched_lower:
+            cleaned_missing.append(skill)
+
+    return cleaned_missing
+
+
+# =========================
 # LANGCHAIN AI RESUME ANALYSIS
 # =========================
 
@@ -136,11 +172,13 @@ def calculate_resume_ai_analysis(resume_text, job_description):
         missing_skills = data.get("missing_skills", [])
         feedback = data.get("feedback", "AI feedback not available.")
 
-        if not isinstance(matched_skills, list):
-            matched_skills = []
+        matched_skills = clean_skill_list(matched_skills)
+        missing_skills = clean_skill_list(missing_skills)
 
-        if not isinstance(missing_skills, list):
-            missing_skills = []
+        missing_skills = remove_duplicate_missing_skills(
+            matched_skills,
+            missing_skills
+        )
 
         return {
             "score": score,
@@ -164,8 +202,23 @@ def fallback_resume_analysis(resume_text, job_description):
     keywords = re.findall(r'\b[a-zA-Z]{3,}\b', job_description_lower)
     keywords = list(set(keywords))
 
-    matched = [word for word in keywords if word in resume_text_lower]
-    missing = [word for word in keywords if word not in resume_text_lower]
+    matched = [
+        word for word in keywords
+        if word in resume_text_lower
+    ]
+
+    missing = [
+        word for word in keywords
+        if word not in resume_text_lower
+    ]
+
+    matched = clean_skill_list(matched)
+    missing = clean_skill_list(missing)
+
+    missing = remove_duplicate_missing_skills(
+        matched,
+        missing
+    )
 
     score = int((len(matched) / len(keywords)) * 50) if keywords else 0
     score = max(0, min(score, 50))
@@ -186,6 +239,7 @@ def calculate_final_score(resume_score, interview_score):
     try:
         resume_score = int(resume_score)
         interview_score = int(interview_score)
+
     except:
         return None, "Invalid Score"
 
@@ -199,8 +253,10 @@ def calculate_final_score(resume_score, interview_score):
 
     if final_score >= 80:
         status = "Selected"
+
     elif final_score >= 65:
         status = "On Hold"
+
     else:
         status = "Rejected"
 
