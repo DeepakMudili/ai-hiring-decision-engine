@@ -1,4 +1,4 @@
-const API_URL = "https://ai-hiring-decision-engine.onrender.com";
+const API_URL = "https://ai-hiring-decision-engine.onrender.com"; 
 
 
 function logout() {
@@ -353,17 +353,25 @@ async function loadApplications() {
                 <p><strong>Missing Skills:</strong> ${app.missing_skills || "New AI analysis required"}</p>
                 <p><strong>AI Feedback:</strong> ${app.ai_feedback || "New AI analysis required"}</p>
 
-                <input
-                    type="number"
-                    id="interview_${app.id}"
-                    placeholder="Recruiter Score out of 50"
-                    min="0"
-                    max="50"
-                >
+                ${app.final_score !== null && app.final_score !== undefined ? `
 
-                <button onclick="finalDecision(${app.id})">
-                    Submit Final Decision
-                </button>
+    <p><strong>Final Decision Already Submitted</strong></p>
+
+` : `
+
+    <input
+        type="number"
+        id="interview_${app.id}"
+        placeholder="Recruiter Score out of 50"
+        min="0"
+        max="50"
+    >
+
+    <button onclick="finalDecision(${app.id})">
+        Submit Final Decision
+    </button>
+
+`}
 
             </div>
             `;
