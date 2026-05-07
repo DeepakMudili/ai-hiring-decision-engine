@@ -2,9 +2,16 @@ import fitz
 import hashlib
 import re
 import json
-from langchain_ollama import OllamaLLM
+import os
 
-llm = OllamaLLM(model="mistral")
+from dotenv import load_dotenv
+from groq import Groq
+
+load_dotenv()
+
+client = Groq(
+    api_key=os.getenv("GROQ_API_KEY")
+)
 
 
 def hash_password(password):
@@ -69,8 +76,24 @@ Resume:
 """
 
     try:
-        response = llm.invoke(prompt)
-        data = extract_json_from_text(response)
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a strict AI hiring evaluator. Always return valid JSON only."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0.2,
+            max_tokens=600
+        )
+
+        content = response.choices[0].message.content
+        data = extract_json_from_text(content)
 
         if not data:
             raise ValueError("Invalid AI response")
@@ -82,6 +105,12 @@ Resume:
         missing_skills = data.get("missing_skills", [])
         feedback = data.get("feedback", "AI feedback not available.")
 
+        if not isinstance(matched_skills, list):
+            matched_skills = []
+
+        if not isinstance(missing_skills, list):
+            missing_skills = []
+
         return {
             "score": score,
             "matched_skills": ", ".join(matched_skills),
@@ -89,7 +118,7 @@ Resume:
             "feedback": feedback
         }
 
-    except:
+    except Exception:
         return fallback_resume_analysis(resume_text, job_description)
 
 
@@ -110,7 +139,7 @@ def fallback_resume_analysis(resume_text, job_description):
         "score": score,
         "matched_skills": ", ".join(matched[:15]),
         "missing_skills": ", ".join(missing[:15]),
-        "feedback": "Fallback keyword-based analysis used."
+        "feedback": "Fallback keyword-based analysis used because cloud AI response was unavailable."
     }
 
 
