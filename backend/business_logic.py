@@ -5,14 +5,67 @@ import json
 import os
 
 from dotenv import load_dotenv
-from groq import Groq
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
 
 load_dotenv()
 
-client = Groq(
-    api_key=os.getenv("GROQ_API_KEY")
+
+# =========================
+# LANGCHAIN + GROQ MODEL
+# =========================
+
+llm = ChatGroq(
+    model="llama-3.1-8b-instant",
+    groq_api_key=os.getenv("GROQ_API_KEY"),
+    temperature=0.2,
+    max_tokens=600
 )
 
+
+resume_prompt = ChatPromptTemplate.from_messages([
+    (
+        "system",
+        "You are a strict AI hiring evaluator. Always return valid JSON only."
+    ),
+    (
+        "human",
+        """
+Compare this resume with the job description.
+
+Return ONLY valid JSON in this exact format:
+
+{{
+  "score": 0,
+  "matched_skills": ["skill1", "skill2"],
+  "missing_skills": ["skill1", "skill2"],
+  "feedback": "short recruiter-facing explanation"
+}}
+
+Rules:
+- score must be from 0 to 50
+- matched_skills must be relevant skills found in the resume
+- missing_skills must be important job skills missing from the resume
+- feedback must be short and professional
+- no markdown
+- no extra text
+
+Job Description:
+{job_description}
+
+Resume:
+{resume_text}
+"""
+    )
+])
+
+
+resume_chain = resume_prompt | llm
+
+
+# =========================
+# PASSWORD FUNCTIONS
+# =========================
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -21,6 +74,10 @@ def hash_password(password):
 def verify_password(password, hashed_password):
     return hashlib.sha256(password.encode()).hexdigest() == hashed_password
 
+
+# =========================
+# PDF TEXT EXTRACTION
+# =========================
 
 def extract_pdf_text(file_bytes):
     doc = fitz.open(stream=file_bytes, filetype="pdf")
@@ -31,6 +88,10 @@ def extract_pdf_text(file_bytes):
 
     return text
 
+
+# =========================
+# JSON EXTRACTION
+# =========================
 
 def extract_json_from_text(text):
     try:
@@ -49,50 +110,20 @@ def extract_json_from_text(text):
     return None
 
 
+# =========================
+# LANGCHAIN AI RESUME ANALYSIS
+# =========================
+
 def calculate_resume_ai_analysis(resume_text, job_description):
-    prompt = f"""
-You are an AI hiring evaluator.
-
-Compare this resume with the job description.
-
-Return ONLY valid JSON:
-{{
-  "score": 0,
-  "matched_skills": ["skill1", "skill2"],
-  "missing_skills": ["skill1", "skill2"],
-  "feedback": "short recruiter-facing explanation"
-}}
-
-Rules:
-- score must be from 0 to 50
-- no markdown
-- no extra text
-
-Job Description:
-{job_description}
-
-Resume:
-{resume_text[:6000]}
-"""
 
     try:
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a strict AI hiring evaluator. Always return valid JSON only."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            temperature=0.2,
-            max_tokens=600
-        )
+        response = resume_chain.invoke({
+            "job_description": job_description,
+            "resume_text": resume_text[:6000]
+        })
 
-        content = response.choices[0].message.content
+        content = response.content
+
         data = extract_json_from_text(content)
 
         if not data:
@@ -122,6 +153,10 @@ Resume:
         return fallback_resume_analysis(resume_text, job_description)
 
 
+# =========================
+# FALLBACK ANALYSIS
+# =========================
+
 def fallback_resume_analysis(resume_text, job_description):
     resume_text_lower = resume_text.lower()
     job_description_lower = job_description.lower()
@@ -139,9 +174,13 @@ def fallback_resume_analysis(resume_text, job_description):
         "score": score,
         "matched_skills": ", ".join(matched[:15]),
         "missing_skills": ", ".join(missing[:15]),
-        "feedback": "Fallback keyword-based analysis used because cloud AI response was unavailable."
+        "feedback": "Fallback keyword-based analysis used because LangChain AI response was unavailable."
     }
 
+
+# =========================
+# FINAL SCORE
+# =========================
 
 def calculate_final_score(resume_score, interview_score):
     try:
