@@ -33,21 +33,33 @@ async def register(
     password: str = Form(...),
     role: str = Form(...)
 ):
-    existing = supabase.table("users").select("*").eq("email", email).execute()
+    try:
+        if role not in ["job_seeker", "interviewer"]:
+            return {"error": "Role must be job_seeker or interviewer"}
 
-    if existing.data:
-        return {"error": "Email already exists"}
+        existing = supabase.table("users").select("*").eq("email", email).execute()
 
-    hashed_password = hash_password(password)
+        if existing.data:
+            return {"error": "Email already exists"}
 
-    supabase.table("users").insert({
-        "name": name,
-        "email": email,
-        "password": hashed_password,
-        "role": role
-    }).execute()
+        hashed_password = hash_password(password)
 
-    return {"message": "Account created successfully"}
+        result = supabase.table("users").insert({
+            "name": name,
+            "email": email,
+            "password": hashed_password,
+            "role": role
+        }).execute()
+
+        return {
+            "message": "Account created successfully",
+            "data": result.data
+        }
+
+    except Exception as e:
+        return {
+            "error": str(e)
+        }
 
 
 @app.post("/login")
