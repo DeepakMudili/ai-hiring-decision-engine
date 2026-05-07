@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Register</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+
+    <div class="card">
+
+        <h1>Create Account</h1>
+
+        <input type="text" id="registerName" placeholder="Full Name">
+
+        <input type="email" id="registerEmail" placeholder="Email">
+
+        <input type="password" id="registerPassword" placeholder="Password">
+
+        <select id="registerRole">
+            <option value="job_seeker">Job Seeker</option>
+            <option value="interviewer">Interviewer</option>
+        </select>
+
+        <button onclick="register()">Register</button>
+
+        <div id="registerResult"></div>
+
+        <p>
+            Already have account?
+            <a href="index.html">Login</a>
+        </p>
+
+    </div>
+
+</div>
+
+<script src="app.js"></script>
+
+</body>
+</html>

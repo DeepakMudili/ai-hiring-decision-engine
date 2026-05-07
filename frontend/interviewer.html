@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Interviewer Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+
+    <div class="card">
+
+        <h1>Interviewer Dashboard</h1>
+
+        <button onclick="logout()">Logout</button>
+
+        <h2>Post New Job</h2>
+
+        <input type="text" id="jobTitle" placeholder="Job Title">
+
+        <textarea id="jobDescription" placeholder="Job Description"></textarea>
+
+        <input type="number" id="jobVacancies" placeholder="Number of Vacancies">
+
+        <button onclick="postJob()">Post Job</button>
+
+        <div id="jobPostResult"></div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>My Posted Jobs</h2>
+
+        <button onclick="loadPostedJobs()">Load Posted Jobs</button>
+
+        <div id="postedJobsContainer"></div>
+
+    </div>
+
+    <div class="card">
+
+        <h2>Applications</h2>
+
+        <button onclick="loadApplications()">Load Applications</button>
+
+        <div id="applicationsContainer"></div>
+
+        <div class="card">
+
+    <h2>Selected Candidates</h2>
+
+    <button onclick="loadSelectedCandidates()">Load Selected Candidates</button>
+
+    <div id="selectedCandidatesContainer"></div>
+
+</div>
+
+    </div>
+
+</div>
+
+<script src="app.js"></script>
+
+<script>
+    loadPostedJobs();
+    loadApplications();
+</script>
+
+</body>
+</html>

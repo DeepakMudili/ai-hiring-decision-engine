@@ -1,0 +1,139 @@
+import fitz
+import hashlib
+import re
+import json
+from langchain_ollama import OllamaLLM
+
+llm = OllamaLLM(model="mistral")
+
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+def verify_password(password, hashed_password):
+    return hashlib.sha256(password.encode()).hexdigest() == hashed_password
+
+
+def extract_pdf_text(file_bytes):
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
+    text = ""
+
+    for page in doc:
+        text += page.get_text()
+
+    return text
+
+
+def extract_json_from_text(text):
+    try:
+        return json.loads(text)
+    except:
+        pass
+
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+
+    if match:
+        try:
+            return json.loads(match.group())
+        except:
+            pass
+
+    return None
+
+
+def calculate_resume_ai_analysis(resume_text, job_description):
+    prompt = f"""
+You are an AI hiring evaluator.
+
+Compare this resume with the job description.
+
+Return ONLY valid JSON:
+{{
+  "score": 0,
+  "matched_skills": ["skill1", "skill2"],
+  "missing_skills": ["skill1", "skill2"],
+  "feedback": "short recruiter-facing explanation"
+}}
+
+Rules:
+- score must be from 0 to 50
+- no markdown
+- no extra text
+
+Job Description:
+{job_description}
+
+Resume:
+{resume_text[:6000]}
+"""
+
+    try:
+        response = llm.invoke(prompt)
+        data = extract_json_from_text(response)
+
+        if not data:
+            raise ValueError("Invalid AI response")
+
+        score = int(data.get("score", 25))
+        score = max(0, min(score, 50))
+
+        matched_skills = data.get("matched_skills", [])
+        missing_skills = data.get("missing_skills", [])
+        feedback = data.get("feedback", "AI feedback not available.")
+
+        return {
+            "score": score,
+            "matched_skills": ", ".join(matched_skills),
+            "missing_skills": ", ".join(missing_skills),
+            "feedback": feedback
+        }
+
+    except:
+        return fallback_resume_analysis(resume_text, job_description)
+
+
+def fallback_resume_analysis(resume_text, job_description):
+    resume_text_lower = resume_text.lower()
+    job_description_lower = job_description.lower()
+
+    keywords = re.findall(r'\b[a-zA-Z]{3,}\b', job_description_lower)
+    keywords = list(set(keywords))
+
+    matched = [word for word in keywords if word in resume_text_lower]
+    missing = [word for word in keywords if word not in resume_text_lower]
+
+    score = int((len(matched) / len(keywords)) * 50) if keywords else 0
+    score = max(0, min(score, 50))
+
+    return {
+        "score": score,
+        "matched_skills": ", ".join(matched[:15]),
+        "missing_skills": ", ".join(missing[:15]),
+        "feedback": "Fallback keyword-based analysis used."
+    }
+
+
+def calculate_final_score(resume_score, interview_score):
+    try:
+        resume_score = int(resume_score)
+        interview_score = int(interview_score)
+    except:
+        return None, "Invalid Score"
+
+    if resume_score < 0 or resume_score > 50:
+        return None, "Invalid Score"
+
+    if interview_score < 0 or interview_score > 50:
+        return None, "Invalid Score"
+
+    final_score = resume_score + interview_score
+
+    if final_score >= 80:
+        status = "Selected"
+    elif final_score >= 65:
+        status = "On Hold"
+    else:
+        status = "Rejected"
+
+    return final_score, status
