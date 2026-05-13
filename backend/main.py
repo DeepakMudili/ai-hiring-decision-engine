@@ -140,41 +140,74 @@ async def delete_job(job_id: int):
 
     return {"message": "Job deleted successfully"}
 
-
 @app.post("/apply")
 async def apply_job(
     seeker_email: str = Form(...),
     job_id: int = Form(...),
-    file: UploadFile = None
+    file: UploadFile = File(...)
 ):
-    existing = supabase.table("applications") \
-        .select("*") \
-        .eq("seeker_email", seeker_email) \
-        .eq("job_id", job_id) \
-        .execute()
+
+    existing = supabase.table("applications").select("*").eq(
+        "seeker_email",
+        seeker_email
+    ).eq(
+        "job_id",
+        job_id
+    ).execute()
 
     if existing.data:
-        return {"error": "You have already applied for this job."}
-
-    if file is None:
-        return {"error": "Resume file is required"}
-
-    job_result = supabase.table("jobs").select("*").eq("id", job_id).execute()
-
-    if not job_result.data:
-        return {"error": "Job not found"}
-
-    job = job_result.data[0]
+        return {
+            "error": "You already applied for this job"
+        }
 
     file_bytes = await file.read()
+
     resume_text = extract_pdf_text(file_bytes)
+
+    job = supabase.table("jobs").select("*").eq(
+        "id",
+        job_id
+    ).execute()
+
+    if not job.data:
+        return {
+            "error": "Job not found"
+        }
+
+    job_description = job.data[0]["description"]
+
+    # =========================
+    # RESUME STORAGE
+    # =========================
+
+    resume_file_name = (
+        f"{seeker_email}_{job_id}_{file.filename}"
+    )
+
+    supabase.storage.from_("resumes").upload(
+        resume_file_name,
+        file_bytes,
+        {
+            "content-type": "application/pdf"
+        }
+    )
+
+    resume_url = supabase.storage.from_(
+        "resumes"
+    ).get_public_url(
+        resume_file_name
+    )
+
+    # =========================
+    # AI ANALYSIS
+    # =========================
 
     ai_analysis = calculate_resume_ai_analysis(
         resume_text,
-        job["description"]
+        job_description
     )
 
-    supabase.table("applications").insert({
+    insert_result = supabase.table("applications").insert({
         "seeker_email": seeker_email,
         "job_id": job_id,
         "resume_score": ai_analysis["score"],
@@ -183,10 +216,17 @@ async def apply_job(
         "status": "Under Review",
         "matched_skills": ai_analysis["matched_skills"],
         "missing_skills": ai_analysis["missing_skills"],
-        "ai_feedback": ai_analysis["feedback"]
+        "ai_feedback": ai_analysis["feedback"],
+        "resume_url": resume_url
     }).execute()
 
-    return {"message": "Application submitted successfully"}
+    return {
+        "message": "Application submitted successfully",
+        "ai_resume_score": ai_analysis["score"],
+        "matched_skills": ai_analysis["matched_skills"],
+        "missing_skills": ai_analysis["missing_skills"],
+        "ai_feedback": ai_analysis["feedback"]
+    }
 
 
 @app.get("/applications")
@@ -218,7 +258,8 @@ async def get_applications():
                 "posted_by": job["posted_by"],
                 "matched_skills": app_item.get("matched_skills"),
                 "missing_skills": app_item.get("missing_skills"),
-                "ai_feedback": app_item.get("ai_feedback")
+                "ai_feedback": app_item.get("ai_feedback"),
+                "resume_url": app_item.get("resume_url")
             })
 
     return {"applications": data}
