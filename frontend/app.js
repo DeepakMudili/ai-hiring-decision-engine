@@ -1,4 +1,4 @@
-const API_URL = "https://ai-hiring-decision-engine.onrender.com"; 
+const API_URL = "https://ai-hiring-decision-engine.onrender.com";
 
 
 function logout() {
@@ -129,7 +129,7 @@ async function postJob() {
     const data = await response.json();
 
     document.getElementById("jobPostResult").innerHTML =
-        `<p>${data.message}</p>`;
+        `<p>${data.message || data.error}</p>`;
 
     document.getElementById("jobTitle").value = "";
     document.getElementById("jobDescription").value = "";
@@ -171,6 +171,10 @@ async function loadJobs() {
         </div>
         `;
     });
+
+    if (html === "") {
+        html = "<p>No jobs available.</p>";
+    }
 
     document.getElementById("jobsContainer").innerHTML = html;
 }
@@ -240,6 +244,10 @@ async function loadMyStatus() {
         `;
     });
 
+    if (html === "") {
+        html = "<p>No applications found.</p>";
+    }
+
     document.getElementById("statusContainer").innerHTML = html;
 }
 
@@ -282,6 +290,10 @@ async function loadPostedJobs() {
         }
     });
 
+    if (html === "") {
+        html = "<p>No posted jobs found.</p>";
+    }
+
     document.getElementById("postedJobsContainer").innerHTML = html;
 }
 
@@ -310,12 +322,14 @@ async function deleteJob(jobId) {
 
     loadPostedJobs();
     loadApplications();
+    loadSelectedCandidates();
 }
 
 
 /* =========================
    LOAD APPLICATIONS
 ========================= */
+
 async function loadApplications() {
 
     const response = await fetch(`${API_URL}/applications`);
@@ -340,38 +354,66 @@ async function loadApplications() {
                 <h3>${app.job_title}</h3>
 
                 <p><strong>Application ID:</strong> ${app.id}</p>
+
                 <p><strong>Candidate:</strong> ${app.seeker_email}</p>
 
+                ${app.resume_url ? `
+                    <p>
+                        <a href="${app.resume_url}" target="_blank">
+                            View Resume
+                        </a>
+                    </p>
+                ` : `
+                    <p><strong>Resume:</strong> Not available</p>
+                `}
+
                 <p><strong>AI Resume Score:</strong> ${app.resume_score}/50</p>
+
                 <p><strong>Recruiter Score:</strong> ${app.interview_score}/50</p>
+
                 <p><strong>Final Score:</strong> ${app.final_score}/100</p>
+
                 <p><strong>Current Status:</strong> ${app.status}</p>
 
                 <hr>
 
-                <p><strong>Matched Skills:</strong> ${app.matched_skills || "New AI analysis required"}</p>
-                <p><strong>Missing Skills:</strong> ${app.missing_skills || "New AI analysis required"}</p>
-                <p><strong>AI Feedback:</strong> ${app.ai_feedback || "New AI analysis required"}</p>
+                <p><strong>Matched Skills:</strong>
+                ${app.matched_skills || "New AI analysis required"}
+                </p>
 
-                ${app.final_score !== null && app.final_score !== undefined ? `
+                <p><strong>Missing Skills:</strong>
+                ${app.missing_skills || "New AI analysis required"}
+                </p>
 
-    <p><strong>Final Decision Already Submitted</strong></p>
+                <p><strong>AI Feedback:</strong>
+                ${app.ai_feedback || "New AI analysis required"}
+                </p>
 
-` : `
+                ${app.final_score !== null &&
+                  app.final_score !== undefined &&
+                  app.final_score !== 0 ? `
 
-    <input
-        type="number"
-        id="interview_${app.id}"
-        placeholder="Recruiter Score out of 50"
-        min="0"
-        max="50"
-    >
+                    <p>
+                        <strong>
+                            Final Decision Already Submitted
+                        </strong>
+                    </p>
 
-    <button onclick="finalDecision(${app.id})">
-        Submit Final Decision
-    </button>
+                ` : `
 
-`}
+                    <input
+                        type="number"
+                        id="interview_${app.id}"
+                        placeholder="Recruiter Score out of 50"
+                        min="0"
+                        max="50"
+                    >
+
+                    <button onclick="finalDecision(${app.id})">
+                        Submit Final Decision
+                    </button>
+
+                `}
 
             </div>
             `;
@@ -379,7 +421,10 @@ async function loadApplications() {
     });
 
     if (html === "") {
-        html = "<p>No active applications to review.</p>";
+
+        html = `
+        <p>No active applications to review.</p>
+        `;
     }
 
     document.getElementById("applicationsContainer").innerHTML = html;
@@ -431,7 +476,13 @@ async function finalDecision(applicationId) {
 
     loadApplications();
     loadPostedJobs();
+    loadSelectedCandidates();
 }
+
+
+/* =========================
+   SELECTED CANDIDATES
+========================= */
 
 async function loadSelectedCandidates() {
 
@@ -456,6 +507,17 @@ async function loadSelectedCandidates() {
                 <h3>${app.job_title}</h3>
 
                 <p><strong>Candidate:</strong> ${app.seeker_email}</p>
+
+                ${app.resume_url ? `
+                    <p>
+                        <a href="${app.resume_url}" target="_blank">
+                            View Resume
+                        </a>
+                    </p>
+                ` : `
+                    <p><strong>Resume:</strong> Not available</p>
+                `}
+
                 <p><strong>AI Resume Score:</strong> ${app.resume_score}/50</p>
                 <p><strong>Recruiter Score:</strong> ${app.interview_score}/50</p>
                 <p><strong>Final Score:</strong> ${app.final_score}/100</p>
