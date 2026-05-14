@@ -414,7 +414,7 @@ async def my_status(email: str):
 @app.get("/semantic-search")
 async def semantic_search(query: str):
     try:
-        matches = search_resumes(query)
+        matches = search_resumes(query, applications)
 
         applications_result = supabase.table("applications").select("*").execute()
         jobs_result = supabase.table("jobs").select("*").execute()

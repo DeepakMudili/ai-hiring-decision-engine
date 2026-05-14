@@ -31,34 +31,35 @@ def add_resume_embedding(application_id, seeker_email, job_id, resume_text):
         }]
     )
 
-
-def search_resumes(query, top_k=5):
-    embedding_model = get_model()
-    embedding = embedding_model.encode(query).tolist()
-
-    results = collection.query(
-        query_embeddings=[embedding],
-        n_results=top_k
-    )
+def search_resumes(query, applications):
+    query_words = query.lower().split()
 
     matches = []
 
-    if results and results.get("metadatas"):
-        metadatas = results["metadatas"][0]
-        distances = results.get("distances", [[]])[0]
+    for app in applications:
 
-        for index, metadata in enumerate(metadatas):
-            distance = distances[index] if index < len(distances) else None
-            match_score = 0
+        searchable_text = f"""
+        {app.get("matched_skills", "")}
+        {app.get("missing_skills", "")}
+        {app.get("ai_feedback", "")}
+        {app.get("candidate_summary", "")}
+        """.lower()
 
-            if distance is not None:
-                match_score = max(0, int((1 - distance) * 100))
+        score = 0
 
+        for word in query_words:
+            if word in searchable_text:
+                score += 1
+
+        if score > 0:
             matches.append({
-                "application_id": metadata.get("application_id"),
-                "seeker_email": metadata.get("seeker_email"),
-                "job_id": metadata.get("job_id"),
-                "semantic_match_score": match_score
+                "application_id": app["id"],
+                "semantic_match_score": min(score * 20, 100)
             })
 
-    return matches
+    matches.sort(
+        key=lambda x: x["semantic_match_score"],
+        reverse=True
+    )
+
+    return matches[:5]
