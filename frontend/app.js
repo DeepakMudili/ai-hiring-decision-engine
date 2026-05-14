@@ -564,9 +564,9 @@ function toggleSelectedCandidates() {
    SEMANTIC SEARCH
 ========================= */
 async function semanticSearch() {
-
     const query = document.getElementById("semanticSearchInput").value;
     const button = document.getElementById("semanticSearchBtn");
+    const container = document.getElementById("semanticSearchContainer");
 
     if (!query) {
         alert("Please enter search text");
@@ -575,6 +575,7 @@ async function semanticSearch() {
 
     button.innerText = "Searching...";
     button.disabled = true;
+    container.innerHTML = "<p>Searching candidates...</p>";
 
     try {
         const response = await fetch(
@@ -582,6 +583,11 @@ async function semanticSearch() {
         );
 
         const data = await response.json();
+
+        if (data.error) {
+            container.innerHTML = `<p class="error">${data.error}</p>`;
+            return;
+        }
 
         let html = "";
 
@@ -592,35 +598,25 @@ async function semanticSearch() {
                     <h3>${match.job_title}</h3>
                     <p><strong>Candidate:</strong> ${match.candidate}</p>
                     <p><strong>AI Score:</strong> ${match.ai_score}/50</p>
-                    <p><strong>Semantic Match:</strong> ${match.semantic_match_score}%</p>
                     <p><strong>Status:</strong> ${match.status}</p>
                     <p><strong>Matched Skills:</strong> ${match.matched_skills || "Not available"}</p>
                     <p><strong>Missing Skills:</strong> ${match.missing_skills || "Not available"}</p>
-
-                    ${match.resume_url ? `
-                        <p>
-                            <a class="resume-link" href="${match.resume_url}" target="_blank">
-                                View Resume
-                            </a>
-                        </p>
-                    ` : ""}
-                </div>
-                `;
+                </div>`;
             });
         } else {
-            html = "<p>No semantic matches found.</p>";
+            html = "<p>No semantic matches found. Apply with a resume first.</p>";
         }
 
-        document.getElementById("semanticSearchContainer").innerHTML = html;
+        container.innerHTML = html;
 
     } catch (error) {
-        alert("Semantic search failed. Please try again.");
+        container.innerHTML =
+            `<p class="error">Semantic search failed because backend did not respond.</p>`;
     }
 
     button.innerText = "Search Candidates";
     button.disabled = false;
 }
-
 
 /* =========================
    GENERATE QUESTIONS
@@ -725,10 +721,10 @@ async function loadAnalytics() {
    RECRUITER COPILOT
 ========================= */
 async function askRecruiterCopilot() {
-
     const question = document.getElementById("copilotQuestion").value;
     const recruiterEmail = localStorage.getItem("userEmail");
     const button = document.getElementById("copilotBtn");
+    const box = document.getElementById("copilotAnswer");
 
     if (!question) {
         alert("Please enter a question");
@@ -737,6 +733,8 @@ async function askRecruiterCopilot() {
 
     button.innerText = "Thinking...";
     button.disabled = true;
+    box.style.display = "block";
+    box.innerHTML = "<p>Copilot is thinking...</p>";
 
     const formData = new FormData();
     formData.append("question", question);
@@ -750,20 +748,18 @@ async function askRecruiterCopilot() {
 
         const data = await response.json();
 
-        const box = document.getElementById("copilotAnswer");
-        box.style.display = "block";
-
         if (data.answer) {
             box.innerHTML = `
                 <h4>Copilot Answer</h4>
                 <pre>${data.answer}</pre>
             `;
         } else {
-            box.innerHTML = `<p>${data.error}</p>`;
+            box.innerHTML = `<p class="error">${data.error || "No answer returned."}</p>`;
         }
 
     } catch (error) {
-        alert("Recruiter copilot failed. Please try again.");
+        box.innerHTML =
+            `<p class="error">Recruiter copilot failed because backend did not respond.</p>`;
     }
 
     button.innerText = "Ask Copilot";

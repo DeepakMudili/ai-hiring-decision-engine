@@ -411,7 +411,6 @@ async def my_status(email: str):
     except Exception as e:
         return {"error": str(e)}
 
-
 @app.get("/semantic-search")
 async def semantic_search(query: str):
     try:
@@ -420,26 +419,20 @@ async def semantic_search(query: str):
         applications_result = supabase.table("applications").select("*").execute()
         jobs_result = supabase.table("jobs").select("*").execute()
 
-        applications = applications_result.data
-        jobs = jobs_result.data
+        applications = applications_result.data or []
+        jobs = jobs_result.data or []
 
         enriched_matches = []
 
         for match in matches:
             application = next(
-                (
-                    app for app in applications
-                    if app["id"] == match["application_id"]
-                ),
+                (app for app in applications if app["id"] == match["application_id"]),
                 None
             )
 
             if application:
                 job = next(
-                    (
-                        j for j in jobs
-                        if j["id"] == application["job_id"]
-                    ),
+                    (j for j in jobs if j["id"] == application["job_id"]),
                     None
                 )
 
@@ -447,9 +440,9 @@ async def semantic_search(query: str):
                     "application_id": application["id"],
                     "candidate": application["seeker_email"],
                     "job_title": job["title"] if job else "Unknown",
-                    "ai_score": application["resume_score"],
-                    "status": application["status"],
-                    "semantic_match_score": match["semantic_match_score"],
+                    "ai_score": application.get("resume_score", 0),
+                    "status": application.get("status", "Unknown"),
+                    "semantic_match_score": match.get("semantic_match_score", 0),
                     "resume_url": application.get("resume_url"),
                     "matched_skills": application.get("matched_skills"),
                     "missing_skills": application.get("missing_skills")
@@ -461,8 +454,12 @@ async def semantic_search(query: str):
         }
 
     except Exception as e:
-        return {"error": str(e)}
-
+        print("Semantic Search Error:", str(e))
+        return {
+            "query": query,
+            "matches": [],
+            "error": f"Semantic search backend error: {str(e)}"
+        }
 
 @app.post("/generate-questions")
 async def generate_questions(
@@ -572,8 +569,8 @@ async def recruiter_copilot(
         apps_result = supabase.table("applications").select("*").execute()
         jobs_result = supabase.table("jobs").select("*").execute()
 
-        jobs = jobs_result.data
-        applications = apps_result.data
+        jobs = jobs_result.data or []
+        applications = apps_result.data or []
 
         recruiter_data = []
 
@@ -585,28 +582,30 @@ async def recruiter_copilot(
 
             if job and job["posted_by"] == recruiter_email:
                 recruiter_data.append({
-                    "candidate": app_item["seeker_email"],
-                    "job_title": job["title"],
-                    "ai_score": app_item["resume_score"],
-                    "recruiter_score": app_item["interview_score"],
-                    "final_score": app_item["final_score"],
-                    "status": app_item["status"],
+                    "candidate": app_item.get("seeker_email"),
+                    "job_title": job.get("title"),
+                    "ai_score": app_item.get("resume_score"),
+                    "final_score": app_item.get("final_score"),
+                    "status": app_item.get("status"),
                     "matched_skills": app_item.get("matched_skills"),
                     "missing_skills": app_item.get("missing_skills"),
                     "ai_feedback": app_item.get("ai_feedback"),
                     "candidate_summary": app_item.get("candidate_summary")
                 })
 
-        answer = recruiter_copilot_answer(
-            question,
-            recruiter_data
-        )
+        if not recruiter_data:
+            return {
+                "answer": "No candidate data found for your recruiter account yet. Post a job and ask candidates to apply first."
+            }
+
+        answer = recruiter_copilot_answer(question, recruiter_data)
 
         return {
             "answer": answer
         }
 
     except Exception as e:
+        print("Recruiter Copilot Error:", str(e))
         return {
-            "error": str(e)
-        }    
+            "error": f"Recruiter copilot backend error: {str(e)}"
+        }
