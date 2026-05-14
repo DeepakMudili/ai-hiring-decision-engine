@@ -4,40 +4,29 @@
     <title>Job Seeker Dashboard</title>
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body onload="loadJobs(); loadMyStatus();">
 
-<div class="container">
+    <div class="container">
 
-    <div class="card">
+        <div class="top-bar">
+            <h1>Job Seeker Dashboard</h1>
+            <button onclick="logout()">Logout</button>
+        </div>
 
-        <h1>Job Seeker Dashboard</h1>
+        <div class="card">
+            <h2>Available Jobs</h2>
+            <button onclick="loadJobs()">Refresh Jobs</button>
+            <div id="jobsContainer"></div>
+        </div>
 
-        <button onclick="logout()">Logout</button>
-
-        <h2>Available Jobs</h2>
-
-        <div id="jobsContainer"></div>
-
-    </div>
-
-    <div class="card">
-
-        <h2>My Application Status</h2>
-
-        <button onclick="loadMyStatus()">Refresh Status</button>
-
-        <div id="statusContainer"></div>
+        <div class="card">
+            <h2>My Application Status</h2>
+            <button onclick="loadMyStatus()">Refresh Status</button>
+            <div id="statusContainer"></div>
+        </div>
 
     </div>
 
-</div>
-
-<script src="app.js"></script>
-
-<script>
-    loadJobs();
-    loadMyStatus();
-</script>
-
+    <script src="app.js"></script>
 </body>
 </html>

@@ -1,71 +1,103 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Interviewer Dashboard</title>
+    <title>Recruiter Dashboard</title>
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body onload="loadPostedJobs(); loadApplications(); loadAnalytics();"></body>
 
-<div class="container">
+    <div class="container">
 
-    <div class="card">
-
-        <h1>Interviewer Dashboard</h1>
-
-        <button onclick="logout()">Logout</button>
-
-        <h2>Post New Job</h2>
-
-        <input type="text" id="jobTitle" placeholder="Job Title">
-
-        <textarea id="jobDescription" placeholder="Job Description"></textarea>
-
-        <input type="number" id="jobVacancies" placeholder="Number of Vacancies">
-
-        <button onclick="postJob()">Post Job</button>
-
-        <div id="jobPostResult"></div>
-
-    </div>
-
-    <div class="card">
-
-        <h2>My Posted Jobs</h2>
-
-        <button onclick="loadPostedJobs()">Load Posted Jobs</button>
-
-        <div id="postedJobsContainer"></div>
-
-    </div>
-
-    <div class="card">
-
-        <h2>Applications</h2>
-
-        <button onclick="loadApplications()">Load Applications</button>
-
-        <div id="applicationsContainer"></div>
+        <div class="top-bar">
+            <h1>Recruiter Dashboard</h1>
+            <button onclick="logout()">Logout</button>
+        </div>
 
         <div class="card">
+            <h2>Post New Job</h2>
+
+            <input type="text" id="jobTitle" placeholder="Job Title">
+
+            <textarea id="jobDescription" placeholder="Job Description"></textarea>
+
+            <input type="number" id="jobVacancies" placeholder="Number of Vacancies">
+
+            <button onclick="postJob()">Post Job</button>
+
+            <div id="jobPostResult"></div>
+        </div>
+
+        <div class="card">
+            <h2>Analytics Dashboard</h2>
+
+            <button onclick="loadAnalytics()">Load Analytics</button>
+
+            <div id="analyticsContainer"></div>
+        </div>
+        <div class="card">
+    <h2>AI Recruiter Copilot</h2>
+
+    <textarea
+        id="copilotQuestion"
+        placeholder="Ask: Who is the best candidate for Python role?"
+    ></textarea>
+
+    <button onclick="askRecruiterCopilot()">
+        Ask Copilot
+    </button>
+
+    <div id="copilotAnswer" class="questions-box"></div>
+</div>
+
+        <div class="card">
+            <h2>Semantic Candidate Search</h2>
+
+            <input
+                type="text"
+                id="semanticSearchInput"
+                placeholder="Example: Python FastAPI RAG SQL candidate"
+            >
+
+            <button onclick="semanticSearch()">Search Candidates</button>
+
+            <div id="semanticSearchContainer"></div>
+        </div>
+
+        <div class="card">
+            <h2>My Posted Jobs</h2>
+
+            <button onclick="loadPostedJobs()">Load Posted Jobs</button>
+
+            <div id="postedJobsContainer"></div>
+        </div>
+
+        <div class="card">
+            <h2>Active Applications</h2>
+
+            <button onclick="loadApplications()">Load Applications</button>
+
+            <div id="applicationsContainer"></div>
+        </div>
+
+      <div class="card">
 
     <h2>Selected Candidates</h2>
 
-    <button onclick="loadSelectedCandidates()">Load Selected Candidates</button>
+    <button onclick="toggleSelectedCandidates()">
+        Show / Hide Selected Candidates
+    </button>
 
-    <div id="selectedCandidatesContainer"></div>
+    <div
+        id="selectedCandidatesSection"
+        style="display: none;"
+    >
+        <div id="selectedCandidatesContainer"></div>
+    </div>
 
 </div>
 
     </div>
 
-</div>
-
-<script src="app.js"></script>
-
-<script>
-    loadPostedJobs();
-    loadApplications();
-</script>
-
+    <script src="app.js"></script>
 </body>
 </html>

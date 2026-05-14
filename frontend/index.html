@@ -1,35 +1,35 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Login</title>
+    <title>AI Hiring Intelligence Platform - Login</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="container">
+    <div class="container">
 
-    <div class="card">
-        <h1>Hiring Decision Engine</h1>
+        <div class="card auth-card">
 
-        <h2>Login</h2>
+            <h1>AI Hiring Intelligence Platform</h1>
+            <p>Login to continue</p>
 
-        <input type="email" id="loginEmail" placeholder="Email">
+            <input type="email" id="loginEmail" placeholder="Email">
 
-        <input type="password" id="loginPassword" placeholder="Password">
+            <input type="password" id="loginPassword" placeholder="Password">
 
-        <button onclick="login()">Login</button>
+            <button onclick="login()">Login</button>
 
-        <p>
-            Don't have an account?
-            <a href="register.html">Register</a>
-        </p>
+            <div id="loginResult"></div>
 
-        <div id="loginResult"></div>
+            <p>
+                New user?
+                <a href="register.html">Create an account</a>
+            </p>
+
+        </div>
+
     </div>
 
-</div>
-
-<script src="app.js"></script>
-
+    <script src="app.js"></script>
 </body>
 </html>

@@ -1,4 +1,5 @@
-const API_URL = "https://ai-hiring-decision-engine.onrender.com";
+const API_URL = "https://ai-hiring-decision-engine.onrender.com"; 
+
 
 
 function logout() {
@@ -23,6 +24,23 @@ async function register() {
         return;
     }
 
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+if (!emailPattern.test(email)) {
+    alert("Please enter a valid email address");
+    return;
+}
+
+const passwordPattern =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+
+if (!passwordPattern.test(password)) {
+    alert(
+        "Password must be at least 8 characters and include uppercase letter, lowercase letter, number, and special character."
+    );
+    return;
+}
+
     const formData = new FormData();
 
     formData.append("name", name);
@@ -39,7 +57,7 @@ async function register() {
 
     if (data.message) {
         document.getElementById("registerResult").innerHTML =
-            `<p>${data.message}</p>`;
+            `<p class="success">${data.message}</p>`;
 
         setTimeout(() => {
             window.location.href = "index.html";
@@ -47,7 +65,7 @@ async function register() {
 
     } else {
         document.getElementById("registerResult").innerHTML =
-            `<p>${data.error}</p>`;
+            `<p class="error">${data.error}</p>`;
     }
 }
 
@@ -92,7 +110,7 @@ async function login() {
 
     } else {
         document.getElementById("loginResult").innerHTML =
-            `<p>${data.error}</p>`;
+            `<p class="error">${data.error}</p>`;
     }
 }
 
@@ -129,13 +147,14 @@ async function postJob() {
     const data = await response.json();
 
     document.getElementById("jobPostResult").innerHTML =
-        `<p>${data.message || data.error}</p>`;
+        `<p class="success">${data.message || data.error}</p>`;
 
     document.getElementById("jobTitle").value = "";
     document.getElementById("jobDescription").value = "";
     document.getElementById("jobVacancies").value = "";
 
     loadPostedJobs();
+    loadAnalytics();
 }
 
 
@@ -281,7 +300,7 @@ async function loadPostedJobs() {
                 <p><strong>Selected:</strong> ${job.selected_count}</p>
                 <p><strong>Remaining:</strong> ${job.remaining}</p>
 
-                <button onclick="deleteJob(${job.id})">
+                <button class="danger-btn" onclick="deleteJob(${job.id})">
                     Delete Job
                 </button>
 
@@ -323,6 +342,7 @@ async function deleteJob(jobId) {
     loadPostedJobs();
     loadApplications();
     loadSelectedCandidates();
+    loadAnalytics();
 }
 
 
@@ -348,86 +368,107 @@ async function loadApplications() {
             app.status !== "Selected"
         ) {
 
-            html += `
-            <div class="job-card">
-
-                <h3>${app.job_title}</h3>
-
-                <p><strong>Application ID:</strong> ${app.id}</p>
-
-                <p><strong>Candidate:</strong> ${app.seeker_email}</p>
-
-                ${app.resume_url ? `
-                    <p>
-                        <a href="${app.resume_url}" target="_blank">
-                            View Resume
-                        </a>
-                    </p>
-                ` : `
-                    <p><strong>Resume:</strong> Not available</p>
-                `}
-
-                <p><strong>AI Resume Score:</strong> ${app.resume_score}/50</p>
-
-                <p><strong>Recruiter Score:</strong> ${app.interview_score}/50</p>
-
-                <p><strong>Final Score:</strong> ${app.final_score}/100</p>
-
-                <p><strong>Current Status:</strong> ${app.status}</p>
-
-                <hr>
-
-                <p><strong>Matched Skills:</strong>
-                ${app.matched_skills || "New AI analysis required"}
-                </p>
-
-                <p><strong>Missing Skills:</strong>
-                ${app.missing_skills || "New AI analysis required"}
-                </p>
-
-                <p><strong>AI Feedback:</strong>
-                ${app.ai_feedback || "New AI analysis required"}
-                </p>
-
-                ${app.final_score !== null &&
-                  app.final_score !== undefined &&
-                  app.final_score !== 0 ? `
-
-                    <p>
-                        <strong>
-                            Final Decision Already Submitted
-                        </strong>
-                    </p>
-
-                ` : `
-
-                    <input
-                        type="number"
-                        id="interview_${app.id}"
-                        placeholder="Recruiter Score out of 50"
-                        min="0"
-                        max="50"
-                    >
-
-                    <button onclick="finalDecision(${app.id})">
-                        Submit Final Decision
-                    </button>
-
-                `}
-
-            </div>
-            `;
+            html += applicationCard(app, true);
         }
     });
 
     if (html === "") {
-
-        html = `
-        <p>No active applications to review.</p>
-        `;
+        html = "<p>No active applications to review.</p>";
     }
 
     document.getElementById("applicationsContainer").innerHTML = html;
+}
+
+
+/* =========================
+   APPLICATION CARD
+========================= */
+
+function applicationCard(app, showDecision) {
+
+    return `
+    <div class="job-card">
+
+        <h3>${app.job_title}</h3>
+
+        <p><strong>Application ID:</strong> ${app.id}</p>
+
+        <p><strong>Candidate:</strong> ${app.seeker_email}</p>
+
+        ${app.resume_url ? `
+            <p>
+                <a class="resume-link" href="${app.resume_url}" target="_blank">
+                    View Resume
+                </a>
+            </p>
+        ` : `
+            <p><strong>Resume:</strong> Not available</p>
+        `}
+
+        <p><strong>AI Resume Score:</strong> ${app.resume_score}/50</p>
+
+        <p><strong>Recruiter Score:</strong> ${app.interview_score}/50</p>
+
+        <p><strong>Final Score:</strong> ${app.final_score}/100</p>
+
+        <p><strong>Status:</strong> ${app.status}</p>
+
+        <hr>
+
+        <p><strong>Candidate Summary:</strong>
+        ${app.candidate_summary || "Not available"}
+        </p>
+
+        <p><strong>Matched Skills:</strong>
+        ${app.matched_skills || "Not available"}
+        </p>
+
+        <p><strong>Missing Skills:</strong>
+        ${app.missing_skills || "Not available"}
+        </p>
+
+        <p><strong>AI Feedback:</strong>
+        ${app.ai_feedback || "Not available"}
+        </p>
+
+        <button onclick="generateQuestions(${app.id})">
+            Generate Interview Questions
+        </button>
+
+        <div id="questions_${app.id}" class="questions-box"></div>
+
+        ${showDecision ? decisionSection(app) : ""}
+
+    </div>
+    `;
+}
+
+
+function decisionSection(app) {
+
+    if (
+        app.final_score !== null &&
+        app.final_score !== undefined &&
+        app.final_score !== 0
+    ) {
+        return `
+        <p><strong>Final Decision Already Submitted</strong></p>
+        `;
+    }
+
+    return `
+    <input
+        type="number"
+        id="interview_${app.id}"
+        placeholder="Recruiter Score out of 50"
+        min="0"
+        max="50"
+    >
+
+    <button onclick="finalDecision(${app.id})">
+        Submit Final Decision
+    </button>
+    `;
 }
 
 
@@ -477,6 +518,7 @@ async function finalDecision(applicationId) {
     loadApplications();
     loadPostedJobs();
     loadSelectedCandidates();
+    loadAnalytics();
 }
 
 
@@ -501,30 +543,7 @@ async function loadSelectedCandidates() {
             app.status === "Selected"
         ) {
 
-            html += `
-            <div class="job-card">
-
-                <h3>${app.job_title}</h3>
-
-                <p><strong>Candidate:</strong> ${app.seeker_email}</p>
-
-                ${app.resume_url ? `
-                    <p>
-                        <a href="${app.resume_url}" target="_blank">
-                            View Resume
-                        </a>
-                    </p>
-                ` : `
-                    <p><strong>Resume:</strong> Not available</p>
-                `}
-
-                <p><strong>AI Resume Score:</strong> ${app.resume_score}/50</p>
-                <p><strong>Recruiter Score:</strong> ${app.interview_score}/50</p>
-                <p><strong>Final Score:</strong> ${app.final_score}/100</p>
-                <p><strong>Status:</strong> ${app.status}</p>
-
-            </div>
-            `;
+            html += applicationCard(app, false);
         }
     });
 
@@ -533,4 +552,227 @@ async function loadSelectedCandidates() {
     }
 
     document.getElementById("selectedCandidatesContainer").innerHTML = html;
+}
+
+
+/* =========================
+   SEMANTIC SEARCH
+========================= */
+
+async function semanticSearch() {
+
+    const query = document.getElementById("semanticSearchInput").value;
+
+    if (!query) {
+        alert("Please enter search text");
+        return;
+    }
+
+    const response = await fetch(
+        `${API_URL}/semantic-search?query=${encodeURIComponent(query)}`
+    );
+
+    const data = await response.json();
+
+    let html = "";
+
+    if (data.matches && data.matches.length > 0) {
+
+        data.matches.forEach(match => {
+
+            html += `
+            <div class="job-card">
+
+                <h3>${match.job_title}</h3>
+
+                <p><strong>Candidate:</strong> ${match.candidate}</p>
+
+                <p><strong>AI Score:</strong> ${match.ai_score}/50</p>
+
+                <p><strong>Semantic Match:</strong> ${match.semantic_match_score}%</p>
+
+                <p><strong>Status:</strong> ${match.status}</p>
+
+                <p><strong>Matched Skills:</strong> ${match.matched_skills || "Not available"}</p>
+
+                <p><strong>Missing Skills:</strong> ${match.missing_skills || "Not available"}</p>
+
+                ${match.resume_url ? `
+                    <p>
+                        <a class="resume-link" href="${match.resume_url}" target="_blank">
+                            View Resume
+                        </a>
+                    </p>
+                ` : ""}
+
+            </div>
+            `;
+        });
+
+    } else {
+        html = "<p>No semantic matches found.</p>";
+    }
+
+    document.getElementById("semanticSearchContainer").innerHTML = html;
+}
+
+
+/* =========================
+   GENERATE QUESTIONS
+========================= */
+
+async function generateQuestions(applicationId) {
+
+    const formData = new FormData();
+
+    formData.append("application_id", applicationId);
+
+    const response = await fetch(`${API_URL}/generate-questions`, {
+        method: "POST",
+        body: formData
+    });
+
+    const data = await response.json();
+
+    const box = document.getElementById(`questions_${applicationId}`);
+
+box.style.display = "block";
+
+    if (data.questions) {
+        box.innerHTML = `
+        <h4>AI Interview Questions</h4>
+        <pre>${data.questions}</pre>
+        `;
+    } else {
+        box.innerHTML = `<p>${data.error}</p>`;
+    }
+}
+
+
+/* =========================
+   ANALYTICS
+========================= */
+
+async function loadAnalytics() {
+
+    const response = await fetch(`${API_URL}/analytics`);
+
+    const data = await response.json();
+
+    if (data.error) {
+        document.getElementById("analyticsContainer").innerHTML =
+            `<p>${data.error}</p>`;
+        return;
+    }
+
+    document.getElementById("analyticsContainer").innerHTML = `
+    <div class="analytics-grid">
+
+        <div class="analytics-card">
+            <h3>${data.total_jobs}</h3>
+            <p>Total Jobs</p>
+        </div>
+
+        <div class="analytics-card">
+            <h3>${data.total_applications}</h3>
+            <p>Total Applications</p>
+        </div>
+
+        <div class="analytics-card">
+            <h3>${data.selected}</h3>
+            <p>Selected</p>
+        </div>
+
+        <div class="analytics-card">
+            <h3>${data.rejected}</h3>
+            <p>Rejected</p>
+        </div>
+
+        <div class="analytics-card">
+            <h3>${data.on_hold}</h3>
+            <p>On Hold</p>
+        </div>
+
+        <div class="analytics-card">
+            <h3>${data.under_review}</h3>
+            <p>Under Review</p>
+        </div>
+
+        <div class="analytics-card">
+            <h3>${data.average_ai_score}</h3>
+            <p>Avg AI Score</p>
+        </div>
+
+    </div>
+    `;
+}
+
+function toggleSelectedCandidates() {
+
+    const section = document.getElementById(
+        "selectedCandidatesSection"
+    );
+
+    if (section.style.display === "none") {
+
+        section.style.display = "block";
+
+        loadSelectedCandidates();
+
+    } else {
+
+        section.style.display = "none";
+    }
+}function toggleSelectedCandidates() {
+
+    const section = document.getElementById(
+        "selectedCandidatesSection"
+    );
+
+    if (section.style.display === "none") {
+
+        section.style.display = "block";
+
+        loadSelectedCandidates();
+
+    } else {
+
+        section.style.display = "none";
+    }
+}
+
+async function askRecruiterCopilot() {
+
+    const question = document.getElementById("copilotQuestion").value;
+    const recruiterEmail = localStorage.getItem("userEmail");
+
+    if (!question) {
+        alert("Please enter a question");
+        return;
+    }
+
+    const formData = new FormData();
+
+    formData.append("question", question);
+    formData.append("recruiter_email", recruiterEmail);
+
+    const response = await fetch(`${API_URL}/recruiter-copilot`, {
+        method: "POST",
+        body: formData
+    });
+
+    const data = await response.json();
+
+    const box = document.getElementById("copilotAnswer");
+
+    box.style.display = "block";
+
+    if (data.answer) {
+        box.innerHTML = `
+            <h4>Copilot Answer</h4>
+            <pre>${data.answer}</pre>
+        `;
+    } else {
+        box.innerHTML = `<p>${data.error}</p>`;
+    }
 }
