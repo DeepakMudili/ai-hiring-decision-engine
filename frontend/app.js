@@ -563,75 +563,68 @@ function toggleSelectedCandidates() {
 /* =========================
    SEMANTIC SEARCH
 ========================= */
-
 async function semanticSearch() {
-    const button = document.getElementById("semanticSearchBtn");
-button.innerText = "Searching...";
-button.disabled = true;
 
     const query = document.getElementById("semanticSearchInput").value;
+    const button = document.getElementById("semanticSearchBtn");
 
     if (!query) {
         alert("Please enter search text");
         return;
     }
 
-    const response = await fetch(
-        `${API_URL}/semantic-search?query=${encodeURIComponent(query)}`
-    );
+    button.innerText = "Searching...";
+    button.disabled = true;
 
-    const data = await response.json();
+    try {
+        const response = await fetch(
+            `${API_URL}/semantic-search?query=${encodeURIComponent(query)}`
+        );
 
-    let html = "";
+        const data = await response.json();
 
-    if (data.matches && data.matches.length > 0) {
+        let html = "";
 
-        data.matches.forEach(match => {
+        if (data.matches && data.matches.length > 0) {
+            data.matches.forEach(match => {
+                html += `
+                <div class="job-card">
+                    <h3>${match.job_title}</h3>
+                    <p><strong>Candidate:</strong> ${match.candidate}</p>
+                    <p><strong>AI Score:</strong> ${match.ai_score}/50</p>
+                    <p><strong>Semantic Match:</strong> ${match.semantic_match_score}%</p>
+                    <p><strong>Status:</strong> ${match.status}</p>
+                    <p><strong>Matched Skills:</strong> ${match.matched_skills || "Not available"}</p>
+                    <p><strong>Missing Skills:</strong> ${match.missing_skills || "Not available"}</p>
 
-            html += `
-            <div class="job-card">
+                    ${match.resume_url ? `
+                        <p>
+                            <a class="resume-link" href="${match.resume_url}" target="_blank">
+                                View Resume
+                            </a>
+                        </p>
+                    ` : ""}
+                </div>
+                `;
+            });
+        } else {
+            html = "<p>No semantic matches found.</p>";
+        }
 
-                <h3>${match.job_title}</h3>
+        document.getElementById("semanticSearchContainer").innerHTML = html;
 
-                <p><strong>Candidate:</strong> ${match.candidate}</p>
-
-                <p><strong>AI Score:</strong> ${match.ai_score}/50</p>
-
-                <p><strong>Semantic Match:</strong> ${match.semantic_match_score}%</p>
-
-                <p><strong>Status:</strong> ${match.status}</p>
-
-                <p><strong>Matched Skills:</strong> ${match.matched_skills || "Not available"}</p>
-
-                <p><strong>Missing Skills:</strong> ${match.missing_skills || "Not available"}</p>
-
-                ${match.resume_url ? `
-                    <p>
-                        <a class="resume-link" href="${match.resume_url}" target="_blank">
-                            View Resume
-                        </a>
-                    </p>
-                ` : ""}
-
-            </div>
-            `;
-        });
-
-    } else {
-        html = "<p>No semantic matches found.</p>";
+    } catch (error) {
+        alert("Semantic search failed. Please try again.");
     }
 
-    document.getElementById("semanticSearchContainer").innerHTML = html;
-
     button.innerText = "Search Candidates";
-button.disabled = false;
+    button.disabled = false;
 }
 
 
 /* =========================
    GENERATE QUESTIONS
 ========================= */
-
 async function generateQuestions(applicationId) {
 
     const button = event.target;
@@ -641,11 +634,9 @@ async function generateQuestions(applicationId) {
     button.disabled = true;
 
     const formData = new FormData();
-
     formData.append("application_id", applicationId);
 
     try {
-
         const response = await fetch(`${API_URL}/generate-questions`, {
             method: "POST",
             body: formData
@@ -654,31 +645,24 @@ async function generateQuestions(applicationId) {
         const data = await response.json();
 
         const box = document.getElementById(`questions_${applicationId}`);
-
         box.style.display = "block";
 
         if (data.questions) {
-
             box.innerHTML = `
                 <h4>AI Interview Questions</h4>
                 <pre>${data.questions}</pre>
             `;
-
         } else {
-
             box.innerHTML = `<p>${data.error}</p>`;
         }
 
     } catch (error) {
-
-        alert("Question generation failed.");
-
+        alert("Question generation failed. Please try again.");
     }
 
     button.innerText = originalText;
     button.disabled = false;
 }
-
 /* =========================
    ANALYTICS
 ========================= */
@@ -740,39 +724,48 @@ async function loadAnalytics() {
 /* =========================
    RECRUITER COPILOT
 ========================= */
-
 async function askRecruiterCopilot() {
 
     const question = document.getElementById("copilotQuestion").value;
     const recruiterEmail = localStorage.getItem("userEmail");
+    const button = document.getElementById("copilotBtn");
 
     if (!question) {
         alert("Please enter a question");
         return;
     }
 
-    const formData = new FormData();
+    button.innerText = "Thinking...";
+    button.disabled = true;
 
+    const formData = new FormData();
     formData.append("question", question);
     formData.append("recruiter_email", recruiterEmail);
 
-    const response = await fetch(`${API_URL}/recruiter-copilot`, {
-        method: "POST",
-        body: formData
-    });
+    try {
+        const response = await fetch(`${API_URL}/recruiter-copilot`, {
+            method: "POST",
+            body: formData
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    const box = document.getElementById("copilotAnswer");
+        const box = document.getElementById("copilotAnswer");
+        box.style.display = "block";
 
-    box.style.display = "block";
+        if (data.answer) {
+            box.innerHTML = `
+                <h4>Copilot Answer</h4>
+                <pre>${data.answer}</pre>
+            `;
+        } else {
+            box.innerHTML = `<p>${data.error}</p>`;
+        }
 
-    if (data.answer) {
-        box.innerHTML = `
-            <h4>Copilot Answer</h4>
-            <pre>${data.answer}</pre>
-        `;
-    } else {
-        box.innerHTML = `<p>${data.error}</p>`;
+    } catch (error) {
+        alert("Recruiter copilot failed. Please try again.");
     }
+
+    button.innerText = "Ask Copilot";
+    button.disabled = false;
 }
