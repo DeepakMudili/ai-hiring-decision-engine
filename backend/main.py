@@ -414,25 +414,31 @@ async def my_status(email: str):
 @app.get("/semantic-search")
 async def semantic_search(query: str):
     try:
-        matches = search_resumes(query, applications)
-
         applications_result = supabase.table("applications").select("*").execute()
         jobs_result = supabase.table("jobs").select("*").execute()
 
         applications = applications_result.data or []
         jobs = jobs_result.data or []
 
+        matches = search_resumes(query, applications)
+
         enriched_matches = []
 
         for match in matches:
             application = next(
-                (app for app in applications if app["id"] == match["application_id"]),
+                (
+                    app for app in applications
+                    if app["id"] == match["application_id"]
+                ),
                 None
             )
 
             if application:
                 job = next(
-                    (j for j in jobs if j["id"] == application["job_id"]),
+                    (
+                        j for j in jobs
+                        if j["id"] == application["job_id"]
+                    ),
                     None
                 )
 
@@ -445,7 +451,9 @@ async def semantic_search(query: str):
                     "semantic_match_score": match.get("semantic_match_score", 0),
                     "resume_url": application.get("resume_url"),
                     "matched_skills": application.get("matched_skills"),
-                    "missing_skills": application.get("missing_skills")
+                    "missing_skills": application.get("missing_skills"),
+                    "ai_feedback": application.get("ai_feedback"),
+                    "candidate_summary": application.get("candidate_summary")
                 })
 
         return {
@@ -460,7 +468,6 @@ async def semantic_search(query: str):
             "matches": [],
             "error": f"Semantic search backend error: {str(e)}"
         }
-
 @app.post("/generate-questions")
 async def generate_questions(
     application_id: int = Form(...)
