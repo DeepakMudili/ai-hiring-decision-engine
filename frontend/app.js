@@ -634,31 +634,50 @@ button.disabled = false;
 
 async function generateQuestions(applicationId) {
 
+    const button = event.target;
+    const originalText = button.innerText;
+
+    button.innerText = "Generating...";
+    button.disabled = true;
+
     const formData = new FormData();
 
     formData.append("application_id", applicationId);
 
-    const response = await fetch(`${API_URL}/generate-questions`, {
-        method: "POST",
-        body: formData
-    });
+    try {
 
-    const data = await response.json();
+        const response = await fetch(`${API_URL}/generate-questions`, {
+            method: "POST",
+            body: formData
+        });
 
-    const box = document.getElementById(`questions_${applicationId}`);
+        const data = await response.json();
 
-    box.style.display = "block";
+        const box = document.getElementById(`questions_${applicationId}`);
 
-    if (data.questions) {
-        box.innerHTML = `
-        <h4>AI Interview Questions</h4>
-        <pre>${data.questions}</pre>
-        `;
-    } else {
-        box.innerHTML = `<p>${data.error}</p>`;
+        box.style.display = "block";
+
+        if (data.questions) {
+
+            box.innerHTML = `
+                <h4>AI Interview Questions</h4>
+                <pre>${data.questions}</pre>
+            `;
+
+        } else {
+
+            box.innerHTML = `<p>${data.error}</p>`;
+        }
+
+    } catch (error) {
+
+        alert("Question generation failed.");
+
     }
-}
 
+    button.innerText = originalText;
+    button.disabled = false;
+}
 
 /* =========================
    ANALYTICS
