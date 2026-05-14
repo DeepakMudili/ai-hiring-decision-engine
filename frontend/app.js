@@ -1,5 +1,4 @@
-const API_URL = "https://ai-hiring-decision-engine.onrender.com"; 
-
+const API_URL = "https://ai-hiring-decision-engine.onrender.com";
 
 
 function logout() {
@@ -26,20 +25,20 @@ async function register() {
 
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-if (!emailPattern.test(email)) {
-    alert("Please enter a valid email address");
-    return;
-}
+    if (!emailPattern.test(email)) {
+        alert("Please enter a valid email address");
+        return;
+    }
 
-const passwordPattern =
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+    const passwordPattern =
+        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
 
-if (!passwordPattern.test(password)) {
-    alert(
-        "Password must be at least 8 characters and include uppercase letter, lowercase letter, number, and special character."
-    );
-    return;
-}
+    if (!passwordPattern.test(password)) {
+        alert(
+            "Password must be at least 8 characters and include uppercase letter, lowercase letter, number, and special character."
+        );
+        return;
+    }
 
     const formData = new FormData();
 
@@ -159,13 +158,12 @@ async function postJob() {
 
 
 /* =========================
-   LOAD JOBS FOR JOB SEEKER
+   LOAD JOBS FOR SEEKER
 ========================= */
 
 async function loadJobs() {
 
     const response = await fetch(`${API_URL}/jobs`);
-
     const data = await response.json();
 
     let html = "";
@@ -237,7 +235,7 @@ async function applyJob(jobId) {
 
 
 /* =========================
-   MY APPLICATION STATUS
+   MY STATUS
 ========================= */
 
 async function loadMyStatus() {
@@ -245,7 +243,6 @@ async function loadMyStatus() {
     const email = localStorage.getItem("userEmail");
 
     const response = await fetch(`${API_URL}/my-status/${email}`);
-
     const data = await response.json();
 
     let html = "";
@@ -278,7 +275,6 @@ async function loadMyStatus() {
 async function loadPostedJobs() {
 
     const response = await fetch(`${API_URL}/jobs`);
-
     const data = await response.json();
 
     const interviewerEmail = localStorage.getItem("userEmail");
@@ -341,7 +337,6 @@ async function deleteJob(jobId) {
 
     loadPostedJobs();
     loadApplications();
-    loadSelectedCandidates();
     loadAnalytics();
 }
 
@@ -353,7 +348,6 @@ async function deleteJob(jobId) {
 async function loadApplications() {
 
     const response = await fetch(`${API_URL}/applications`);
-
     const data = await response.json();
 
     const interviewerEmail = localStorage.getItem("userEmail");
@@ -367,8 +361,7 @@ async function loadApplications() {
             app.status !== "Rejected" &&
             app.status !== "Selected"
         ) {
-
-            html += applicationCard(app, true);
+            html += applicationCard(app, true, true);
         }
     });
 
@@ -384,7 +377,7 @@ async function loadApplications() {
    APPLICATION CARD
 ========================= */
 
-function applicationCard(app, showDecision) {
+function applicationCard(app, showDecision, showGenerateQuestions) {
 
     return `
     <div class="job-card">
@@ -431,11 +424,13 @@ function applicationCard(app, showDecision) {
         ${app.ai_feedback || "Not available"}
         </p>
 
-        <button onclick="generateQuestions(${app.id})">
-            Generate Interview Questions
-        </button>
+        ${showGenerateQuestions ? `
+            <button onclick="generateQuestions(${app.id})">
+                Generate Interview Questions
+            </button>
 
-        <div id="questions_${app.id}" class="questions-box"></div>
+            <div id="questions_${app.id}" class="questions-box"></div>
+        ` : ""}
 
         ${showDecision ? decisionSection(app) : ""}
 
@@ -517,7 +512,6 @@ async function finalDecision(applicationId) {
 
     loadApplications();
     loadPostedJobs();
-    loadSelectedCandidates();
     loadAnalytics();
 }
 
@@ -529,7 +523,6 @@ async function finalDecision(applicationId) {
 async function loadSelectedCandidates() {
 
     const response = await fetch(`${API_URL}/applications`);
-
     const data = await response.json();
 
     const interviewerEmail = localStorage.getItem("userEmail");
@@ -542,8 +535,7 @@ async function loadSelectedCandidates() {
             app.posted_by === interviewerEmail &&
             app.status === "Selected"
         ) {
-
-            html += applicationCard(app, false);
+            html += applicationCard(app, false, false);
         }
     });
 
@@ -555,11 +547,27 @@ async function loadSelectedCandidates() {
 }
 
 
+function toggleSelectedCandidates() {
+
+    const section = document.getElementById("selectedCandidatesSection");
+
+    if (section.style.display === "none") {
+        section.style.display = "block";
+        loadSelectedCandidates();
+    } else {
+        section.style.display = "none";
+    }
+}
+
+
 /* =========================
    SEMANTIC SEARCH
 ========================= */
 
 async function semanticSearch() {
+    const button = document.getElementById("semanticSearchBtn");
+button.innerText = "Searching...";
+button.disabled = true;
 
     const query = document.getElementById("semanticSearchInput").value;
 
@@ -614,6 +622,9 @@ async function semanticSearch() {
     }
 
     document.getElementById("semanticSearchContainer").innerHTML = html;
+
+    button.innerText = "Search Candidates";
+button.disabled = false;
 }
 
 
@@ -636,7 +647,7 @@ async function generateQuestions(applicationId) {
 
     const box = document.getElementById(`questions_${applicationId}`);
 
-box.style.display = "block";
+    box.style.display = "block";
 
     if (data.questions) {
         box.innerHTML = `
@@ -656,7 +667,6 @@ box.style.display = "block";
 async function loadAnalytics() {
 
     const response = await fetch(`${API_URL}/analytics`);
-
     const data = await response.json();
 
     if (data.error) {
@@ -707,39 +717,10 @@ async function loadAnalytics() {
     `;
 }
 
-function toggleSelectedCandidates() {
 
-    const section = document.getElementById(
-        "selectedCandidatesSection"
-    );
-
-    if (section.style.display === "none") {
-
-        section.style.display = "block";
-
-        loadSelectedCandidates();
-
-    } else {
-
-        section.style.display = "none";
-    }
-}function toggleSelectedCandidates() {
-
-    const section = document.getElementById(
-        "selectedCandidatesSection"
-    );
-
-    if (section.style.display === "none") {
-
-        section.style.display = "block";
-
-        loadSelectedCandidates();
-
-    } else {
-
-        section.style.display = "none";
-    }
-}
+/* =========================
+   RECRUITER COPILOT
+========================= */
 
 async function askRecruiterCopilot() {
 
