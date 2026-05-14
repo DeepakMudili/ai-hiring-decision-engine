@@ -1,18 +1,24 @@
 import chromadb
-from sentence_transformers import SentenceTransformer
-
 
 client = chromadb.PersistentClient(path="./chroma_db")
+collection = client.get_or_create_collection(name="resume_embeddings")
 
-collection = client.get_or_create_collection(
-    name="resume_embeddings"
-)
+model = None
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
+
+def get_model():
+    global model
+
+    if model is None:
+        from sentence_transformers import SentenceTransformer
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+
+    return model
 
 
 def add_resume_embedding(application_id, seeker_email, job_id, resume_text):
-    embedding = model.encode(resume_text).tolist()
+    embedding_model = get_model()
+    embedding = embedding_model.encode(resume_text).tolist()
 
     collection.add(
         ids=[str(application_id)],
@@ -27,7 +33,8 @@ def add_resume_embedding(application_id, seeker_email, job_id, resume_text):
 
 
 def search_resumes(query, top_k=5):
-    embedding = model.encode(query).tolist()
+    embedding_model = get_model()
+    embedding = embedding_model.encode(query).tolist()
 
     results = collection.query(
         query_embeddings=[embedding],
@@ -42,7 +49,6 @@ def search_resumes(query, top_k=5):
 
         for index, metadata in enumerate(metadatas):
             distance = distances[index] if index < len(distances) else None
-
             match_score = 0
 
             if distance is not None:
