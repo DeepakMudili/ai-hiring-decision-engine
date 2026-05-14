@@ -11,15 +11,11 @@ from langchain_core.prompts import ChatPromptTemplate
 load_dotenv()
 
 
-# =========================
-# LANGCHAIN + GROQ MODEL
-# =========================
-
 llm = ChatGroq(
     model="llama-3.1-8b-instant",
     groq_api_key=os.getenv("GROQ_API_KEY"),
     temperature=0.2,
-    max_tokens=600
+    max_tokens=800
 )
 
 
@@ -39,14 +35,15 @@ Return ONLY valid JSON in this exact format:
   "score": 0,
   "matched_skills": ["skill1", "skill2"],
   "missing_skills": ["skill1", "skill2"],
-  "feedback": "short recruiter-facing explanation"
+  "feedback": "short recruiter-facing explanation",
+  "candidate_summary": "short candidate summary"
 }}
 
 Rules:
 - score must be from 0 to 50
-- matched_skills must be relevant skills clearly found in the resume
-- missing_skills must be important job skills missing from the resume
-- never include the same skill in both matched_skills and missing_skills
+- matched_skills must be skills clearly found in resume
+- missing_skills must be important job skills missing from resume
+- never include same skill in both matched_skills and missing_skills
 - feedback must be short and professional
 - no markdown
 - no extra text
@@ -64,10 +61,6 @@ Resume:
 resume_chain = resume_prompt | llm
 
 
-# =========================
-# PASSWORD FUNCTIONS
-# =========================
-
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
@@ -75,10 +68,6 @@ def hash_password(password):
 def verify_password(password, hashed_password):
     return hashlib.sha256(password.encode()).hexdigest() == hashed_password
 
-
-# =========================
-# PDF TEXT EXTRACTION
-# =========================
 
 def extract_pdf_text(file_bytes):
     doc = fitz.open(stream=file_bytes, filetype="pdf")
@@ -90,10 +79,6 @@ def extract_pdf_text(file_bytes):
 
     return text
 
-
-# =========================
-# JSON EXTRACTION
-# =========================
 
 def extract_json_from_text(text):
     try:
@@ -111,10 +96,6 @@ def extract_json_from_text(text):
 
     return None
 
-
-# =========================
-# SKILL CLEANUP
-# =========================
 
 def clean_skill_list(skills):
     if not isinstance(skills, list):
@@ -137,18 +118,11 @@ def clean_skill_list(skills):
 def remove_duplicate_missing_skills(matched_skills, missing_skills):
     matched_lower = [skill.lower() for skill in matched_skills]
 
-    cleaned_missing = []
+    return [
+        skill for skill in missing_skills
+        if skill.lower() not in matched_lower
+    ]
 
-    for skill in missing_skills:
-        if skill.lower() not in matched_lower:
-            cleaned_missing.append(skill)
-
-    return cleaned_missing
-
-
-# =========================
-# LANGCHAIN AI RESUME ANALYSIS
-# =========================
 
 def calculate_resume_ai_analysis(resume_text, job_description):
 
@@ -158,9 +132,7 @@ def calculate_resume_ai_analysis(resume_text, job_description):
             "resume_text": resume_text[:6000]
         })
 
-        content = response.content
-
-        data = extract_json_from_text(content)
+        data = extract_json_from_text(response.content)
 
         if not data:
             raise ValueError("Invalid AI response")
@@ -168,32 +140,31 @@ def calculate_resume_ai_analysis(resume_text, job_description):
         score = int(data.get("score", 25))
         score = max(0, min(score, 50))
 
-        matched_skills = data.get("matched_skills", [])
-        missing_skills = data.get("missing_skills", [])
-        feedback = data.get("feedback", "AI feedback not available.")
-
-        matched_skills = clean_skill_list(matched_skills)
-        missing_skills = clean_skill_list(missing_skills)
+        matched_skills = clean_skill_list(data.get("matched_skills", []))
+        missing_skills = clean_skill_list(data.get("missing_skills", []))
 
         missing_skills = remove_duplicate_missing_skills(
             matched_skills,
             missing_skills
         )
 
+        feedback = data.get("feedback", "AI feedback not available.")
+        candidate_summary = data.get(
+            "candidate_summary",
+            "Candidate summary not available."
+        )
+
         return {
             "score": score,
             "matched_skills": ", ".join(matched_skills),
             "missing_skills": ", ".join(missing_skills),
-            "feedback": feedback
+            "feedback": feedback,
+            "candidate_summary": candidate_summary
         }
 
     except Exception:
         return fallback_resume_analysis(resume_text, job_description)
 
-
-# =========================
-# FALLBACK ANALYSIS
-# =========================
 
 def fallback_resume_analysis(resume_text, job_description):
     resume_text_lower = resume_text.lower()
@@ -212,14 +183,6 @@ def fallback_resume_analysis(resume_text, job_description):
         if word not in resume_text_lower
     ]
 
-    matched = clean_skill_list(matched)
-    missing = clean_skill_list(missing)
-
-    missing = remove_duplicate_missing_skills(
-        matched,
-        missing
-    )
-
     score = int((len(matched) / len(keywords)) * 50) if keywords else 0
     score = max(0, min(score, 50))
 
@@ -227,13 +190,37 @@ def fallback_resume_analysis(resume_text, job_description):
         "score": score,
         "matched_skills": ", ".join(matched[:15]),
         "missing_skills": ", ".join(missing[:15]),
-        "feedback": "Fallback keyword-based analysis used because LangChain AI response was unavailable."
+        "feedback": "Fallback keyword-based analysis used.",
+        "candidate_summary": "Candidate summary unavailable in fallback mode."
     }
 
 
-# =========================
-# FINAL SCORE
-# =========================
+def generate_interview_questions(resume_text, job_description):
+    prompt = f"""
+Generate interview questions based on the resume and job description.
+
+Return:
+1. 5 technical questions
+2. 3 project-based questions
+3. 3 missing-skill questions
+4. 2 behavioral questions
+
+Keep it clean and recruiter-friendly.
+
+Job Description:
+{job_description}
+
+Resume:
+{resume_text[:5000]}
+"""
+
+    try:
+        response = llm.invoke(prompt)
+        return response.content
+
+    except Exception:
+        return "Unable to generate interview questions right now."
+
 
 def calculate_final_score(resume_score, interview_score):
     try:
@@ -261,3 +248,25 @@ def calculate_final_score(resume_score, interview_score):
         status = "Rejected"
 
     return final_score, status
+
+def recruiter_copilot_answer(question, context):
+    prompt = f"""
+You are an AI Recruiter Copilot.
+
+Answer the recruiter's question using only the provided hiring data.
+
+Be clear, short, and professional.
+
+Recruiter Question:
+{question}
+
+Hiring Data:
+{context}
+"""
+
+    try:
+        response = llm.invoke(prompt)
+        return response.content
+
+    except Exception:
+        return "AI Recruiter Copilot is unavailable right now."

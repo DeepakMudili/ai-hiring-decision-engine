@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import FastAPI, UploadFile, Form, File
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -7,8 +9,13 @@ from business_logic import (
     verify_password,
     extract_pdf_text,
     calculate_resume_ai_analysis,
-    calculate_final_score
+    calculate_final_score,
+    generate_interview_questions,
+    recruiter_copilot_answer
 )
+
+from vector_db import add_resume_embedding, search_resumes
+
 
 app = FastAPI()
 
@@ -23,7 +30,9 @@ app.add_middleware(
 
 @app.get("/")
 def home():
-    return {"message": "Hiring Decision Engine Backend Running with Supabase"}
+    return {
+        "message": "AI Hiring Intelligence Platform Backend Running"
+    }
 
 
 @app.post("/register")
@@ -35,31 +44,31 @@ async def register(
 ):
     try:
         if role not in ["job_seeker", "interviewer"]:
-            return {"error": "Role must be job_seeker or interviewer"}
+            return {
+                "error": "Role must be job_seeker, interviewer, or admin"
+            }
 
-        existing = supabase.table("users").select("*").eq("email", email).execute()
+        existing = supabase.table("users").select("*").eq(
+            "email",
+            email
+        ).execute()
 
         if existing.data:
             return {"error": "Email already exists"}
 
         hashed_password = hash_password(password)
 
-        result = supabase.table("users").insert({
+        supabase.table("users").insert({
             "name": name,
             "email": email,
             "password": hashed_password,
             "role": role
         }).execute()
 
-        return {
-            "message": "Account created successfully",
-            "data": result.data
-        }
+        return {"message": "Account created successfully"}
 
     except Exception as e:
-        return {
-            "error": str(e)
-        }
+        return {"error": str(e)}
 
 
 @app.post("/login")
@@ -67,22 +76,29 @@ async def login(
     email: str = Form(...),
     password: str = Form(...)
 ):
-    result = supabase.table("users").select("*").eq("email", email).execute()
+    try:
+        result = supabase.table("users").select("*").eq(
+            "email",
+            email
+        ).execute()
 
-    if not result.data:
-        return {"error": "Invalid email"}
+        if not result.data:
+            return {"error": "Invalid email"}
 
-    user = result.data[0]
+        user = result.data[0]
 
-    if not verify_password(password, user["password"]):
-        return {"error": "Invalid password"}
+        if not verify_password(password, user["password"]):
+            return {"error": "Invalid password"}
 
-    return {
-        "message": "Login successful",
-        "name": user["name"],
-        "email": user["email"],
-        "role": user["role"]
-    }
+        return {
+            "message": "Login successful",
+            "name": user["name"],
+            "email": user["email"],
+            "role": user["role"]
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.post("/post-job")
@@ -92,53 +108,74 @@ async def post_job(
     posted_by: str = Form(...),
     vacancies: int = Form(...)
 ):
-    supabase.table("jobs").insert({
-        "title": title,
-        "description": description,
-        "posted_by": posted_by,
-        "vacancies": vacancies
-    }).execute()
+    try:
+        supabase.table("jobs").insert({
+            "title": title,
+            "description": description,
+            "posted_by": posted_by,
+            "vacancies": vacancies
+        }).execute()
 
-    return {"message": "Job posted successfully"}
+        return {"message": "Job posted successfully"}
+
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.get("/jobs")
 async def get_jobs():
-    jobs_result = supabase.table("jobs").select("*").execute()
-    applications_result = supabase.table("applications").select("*").execute()
+    try:
+        jobs_result = supabase.table("jobs").select("*").execute()
+        applications_result = supabase.table("applications").select("*").execute()
 
-    jobs = jobs_result.data
-    applications = applications_result.data
+        jobs = jobs_result.data
+        applications = applications_result.data
 
-    all_jobs = []
+        all_jobs = []
 
-    for job in jobs:
-        selected_count = len([
-            app for app in applications
-            if app["job_id"] == job["id"] and app["status"] == "Selected"
-        ])
+        for job in jobs:
+            selected_count = len([
+                app for app in applications
+                if app["job_id"] == job["id"]
+                and app["status"] == "Selected"
+            ])
 
-        remaining = job["vacancies"] - selected_count
+            remaining = job["vacancies"] - selected_count
 
-        all_jobs.append({
-            "id": job["id"],
-            "title": job["title"],
-            "description": job["description"],
-            "posted_by": job["posted_by"],
-            "vacancies": job["vacancies"],
-            "selected_count": selected_count,
-            "remaining": remaining
-        })
+            all_jobs.append({
+                "id": job["id"],
+                "title": job["title"],
+                "description": job["description"],
+                "posted_by": job["posted_by"],
+                "vacancies": job["vacancies"],
+                "selected_count": selected_count,
+                "remaining": remaining
+            })
 
-    return {"jobs": all_jobs}
+        return {"jobs": all_jobs}
+
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.delete("/delete-job/{job_id}")
 async def delete_job(job_id: int):
-    supabase.table("applications").delete().eq("job_id", job_id).execute()
-    supabase.table("jobs").delete().eq("id", job_id).execute()
+    try:
+        supabase.table("applications").delete().eq(
+            "job_id",
+            job_id
+        ).execute()
 
-    return {"message": "Job deleted successfully"}
+        supabase.table("jobs").delete().eq(
+            "id",
+            job_id
+        ).execute()
+
+        return {"message": "Job deleted successfully"}
+
+    except Exception as e:
+        return {"error": str(e)}
+
 
 @app.post("/apply")
 async def apply_job(
@@ -146,123 +183,130 @@ async def apply_job(
     job_id: int = Form(...),
     file: UploadFile = File(...)
 ):
+    try:
+        existing = supabase.table("applications").select("*").eq(
+            "seeker_email",
+            seeker_email
+        ).eq(
+            "job_id",
+            job_id
+        ).execute()
 
-    existing = supabase.table("applications").select("*").eq(
-        "seeker_email",
-        seeker_email
-    ).eq(
-        "job_id",
-        job_id
-    ).execute()
+        if existing.data:
+            return {
+                "error": "You have already applied for this job."
+            }
 
-    if existing.data:
+        job_result = supabase.table("jobs").select("*").eq(
+            "id",
+            job_id
+        ).execute()
+
+        if not job_result.data:
+            return {"error": "Job not found"}
+
+        job = job_result.data[0]
+
+        file_bytes = await file.read()
+        resume_text = extract_pdf_text(file_bytes)
+
+        resume_file_name = (
+            f"{uuid.uuid4()}_{file.filename}"
+        )
+
+        supabase.storage.from_("resumes").upload(
+            resume_file_name,
+            file_bytes,
+            {
+                "content-type": "application/pdf"
+            }
+        )
+
+        resume_url = supabase.storage.from_("resumes").get_public_url(
+            resume_file_name
+        )
+
+        ai_analysis = calculate_resume_ai_analysis(
+            resume_text,
+            job["description"]
+        )
+
+        insert_result = supabase.table("applications").insert({
+            "seeker_email": seeker_email,
+            "job_id": job_id,
+            "resume_score": ai_analysis["score"],
+            "interview_score": 0,
+            "final_score": 0,
+            "status": "Under Review",
+            "matched_skills": ai_analysis["matched_skills"],
+            "missing_skills": ai_analysis["missing_skills"],
+            "ai_feedback": ai_analysis["feedback"],
+            "candidate_summary": ai_analysis["candidate_summary"],
+            "resume_url": resume_url
+        }).execute()
+
+        application_id = insert_result.data[0]["id"]
+
+        add_resume_embedding(
+            application_id,
+            seeker_email,
+            job_id,
+            resume_text
+        )
+
         return {
-            "error": "You already applied for this job"
+            "message": "Application submitted successfully"
         }
 
-    file_bytes = await file.read()
-
-    resume_text = extract_pdf_text(file_bytes)
-
-    job = supabase.table("jobs").select("*").eq(
-        "id",
-        job_id
-    ).execute()
-
-    if not job.data:
-        return {
-            "error": "Job not found"
-        }
-
-    job_description = job.data[0]["description"]
-
-    # =========================
-    # RESUME STORAGE
-    # =========================
-
-    resume_file_name = (
-        f"{seeker_email}_{job_id}_{file.filename}"
-    )
-
-    supabase.storage.from_("resumes").upload(
-        resume_file_name,
-        file_bytes,
-        {
-            "content-type": "application/pdf"
-        }
-    )
-
-    resume_url = supabase.storage.from_(
-        "resumes"
-    ).get_public_url(
-        resume_file_name
-    )
-
-    # =========================
-    # AI ANALYSIS
-    # =========================
-
-    ai_analysis = calculate_resume_ai_analysis(
-        resume_text,
-        job_description
-    )
-
-    insert_result = supabase.table("applications").insert({
-        "seeker_email": seeker_email,
-        "job_id": job_id,
-        "resume_score": ai_analysis["score"],
-        "interview_score": 0,
-        "final_score": 0,
-        "status": "Under Review",
-        "matched_skills": ai_analysis["matched_skills"],
-        "missing_skills": ai_analysis["missing_skills"],
-        "ai_feedback": ai_analysis["feedback"],
-        "resume_url": resume_url
-    }).execute()
-
-    return {
-        "message": "Application submitted successfully",
-        "ai_resume_score": ai_analysis["score"],
-        "matched_skills": ai_analysis["matched_skills"],
-        "missing_skills": ai_analysis["missing_skills"],
-        "ai_feedback": ai_analysis["feedback"]
-    }
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.get("/applications")
 async def get_applications():
-    apps_result = supabase.table("applications").select("*").execute()
-    jobs_result = supabase.table("jobs").select("*").execute()
+    try:
+        apps_result = supabase.table("applications").select("*").execute()
+        jobs_result = supabase.table("jobs").select("*").execute()
 
-    jobs = jobs_result.data
-    applications = apps_result.data
+        jobs = jobs_result.data
+        applications = apps_result.data
 
-    data = []
+        data = []
 
-    for app_item in applications:
-        job = next(
-            (j for j in jobs if j["id"] == app_item["job_id"]),
-            None
+        for app_item in applications:
+            job = next(
+                (j for j in jobs if j["id"] == app_item["job_id"]),
+                None
+            )
+
+            if job:
+                data.append({
+                    "id": app_item["id"],
+                    "seeker_email": app_item["seeker_email"],
+                    "job_id": app_item["job_id"],
+                    "resume_score": app_item["resume_score"],
+                    "interview_score": app_item["interview_score"],
+                    "final_score": app_item["final_score"],
+                    "status": app_item["status"],
+                    "job_title": job["title"],
+                    "posted_by": job["posted_by"],
+                    "matched_skills": app_item.get("matched_skills"),
+                    "missing_skills": app_item.get("missing_skills"),
+                    "ai_feedback": app_item.get("ai_feedback"),
+                    "candidate_summary": app_item.get("candidate_summary"),
+                    "resume_url": app_item.get("resume_url")
+                })
+
+        ranked_data = sorted(
+            data,
+            key=lambda x: x.get("resume_score") or 0,
+            reverse=True
         )
 
-        if job:
-            data.append({
-                "id": app_item["id"],
-                "seeker_email": app_item["seeker_email"],
-                "job_id": app_item["job_id"],
-                "resume_score": app_item["resume_score"],
-                "interview_score": app_item["interview_score"],
-                "final_score": app_item["final_score"],
-                "status": app_item["status"],
-                "job_title": job["title"],
-                "posted_by": job["posted_by"],
-                "matched_skills": app_item.get("matched_skills"),
-                "missing_skills": app_item.get("missing_skills"),
-                "ai_feedback": app_item.get("ai_feedback"),
-                "resume_url": app_item.get("resume_url")
-            })
+        return {"applications": ranked_data}
 
-    return {"applications": data}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.post("/final-decision")
@@ -270,69 +314,299 @@ async def final_decision(
     application_id: int = Form(...),
     interview_score: int = Form(...)
 ):
-    if interview_score < 0 or interview_score > 50:
-        return {"error": "Recruiter score must be between 0 and 50"}
+    try:
+        if interview_score < 0 or interview_score > 50:
+            return {
+                "error": "Recruiter score must be between 0 and 50"
+            }
 
-    app_result = supabase.table("applications").select("*").eq("id", application_id).execute()
+        app_result = supabase.table("applications").select("*").eq(
+            "id",
+            application_id
+        ).execute()
 
-    if not app_result.data:
-        return {"error": "Application not found"}
+        if not app_result.data:
+            return {"error": "Application not found"}
 
-    application = app_result.data[0]
+        application = app_result.data[0]
 
-    final_score, status = calculate_final_score(
-        application["resume_score"],
-        interview_score
-    )
+        final_score, status = calculate_final_score(
+            application["resume_score"],
+            interview_score
+        )
 
-    if status == "Invalid Score":
-        return {"error": "Recruiter score must be between 0 and 50"}
+        if status == "Invalid Score":
+            return {
+                "error": "Invalid score"
+            }
 
-    if status == "Selected":
-        job_result = supabase.table("jobs").select("*").eq("id", application["job_id"]).execute()
-        job = job_result.data[0]
+        if status == "Selected":
+            job_result = supabase.table("jobs").select("*").eq(
+                "id",
+                application["job_id"]
+            ).execute()
 
-        selected_result = supabase.table("applications") \
-            .select("*") \
-            .eq("job_id", application["job_id"]) \
-            .eq("status", "Selected") \
-            .execute()
+            job = job_result.data[0]
 
-        if len(selected_result.data) >= job["vacancies"]:
-            return {"error": "Vacancy limit reached. Cannot select more candidates."}
+            selected_result = supabase.table("applications").select("*").eq(
+                "job_id",
+                application["job_id"]
+            ).eq(
+                "status",
+                "Selected"
+            ).execute()
 
-    supabase.table("applications").update({
-        "interview_score": interview_score,
-        "final_score": final_score,
-        "status": status
-    }).eq("id", application_id).execute()
+            if len(selected_result.data) >= job["vacancies"]:
+                return {
+                    "error": "Vacancy limit reached"
+                }
 
-    return {
-        "message": "Final decision updated",
-        "ai_resume_score": application["resume_score"],
-        "recruiter_score": interview_score,
-        "final_score": final_score,
-        "status": status
-    }
+        supabase.table("applications").update({
+            "interview_score": interview_score,
+            "final_score": final_score,
+            "status": status
+        }).eq(
+            "id",
+            application_id
+        ).execute()
+
+        return {
+            "message": "Final decision updated",
+            "ai_resume_score": application["resume_score"],
+            "recruiter_score": interview_score,
+            "final_score": final_score,
+            "status": status
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.get("/my-status/{email}")
 async def my_status(email: str):
-    apps_result = supabase.table("applications").select("*").eq("seeker_email", email).execute()
-    jobs_result = supabase.table("jobs").select("*").execute()
+    try:
+        apps_result = supabase.table("applications").select("*").eq(
+            "seeker_email",
+            email
+        ).execute()
 
-    result = []
+        jobs_result = supabase.table("jobs").select("*").execute()
 
-    for app_item in apps_result.data:
-        job = next(
-            (j for j in jobs_result.data if j["id"] == app_item["job_id"]),
-            None
+        result = []
+
+        for app_item in apps_result.data:
+            job = next(
+                (j for j in jobs_result.data if j["id"] == app_item["job_id"]),
+                None
+            )
+
+            if job:
+                result.append({
+                    "job_title": job["title"],
+                    "status": app_item["status"]
+                })
+
+        return {"applications": result}
+
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/semantic-search")
+async def semantic_search(query: str):
+    try:
+        matches = search_resumes(query)
+
+        applications_result = supabase.table("applications").select("*").execute()
+        jobs_result = supabase.table("jobs").select("*").execute()
+
+        applications = applications_result.data
+        jobs = jobs_result.data
+
+        enriched_matches = []
+
+        for match in matches:
+            application = next(
+                (
+                    app for app in applications
+                    if app["id"] == match["application_id"]
+                ),
+                None
+            )
+
+            if application:
+                job = next(
+                    (
+                        j for j in jobs
+                        if j["id"] == application["job_id"]
+                    ),
+                    None
+                )
+
+                enriched_matches.append({
+                    "application_id": application["id"],
+                    "candidate": application["seeker_email"],
+                    "job_title": job["title"] if job else "Unknown",
+                    "ai_score": application["resume_score"],
+                    "status": application["status"],
+                    "semantic_match_score": match["semantic_match_score"],
+                    "resume_url": application.get("resume_url"),
+                    "matched_skills": application.get("matched_skills"),
+                    "missing_skills": application.get("missing_skills")
+                })
+
+        return {
+            "query": query,
+            "matches": enriched_matches
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/generate-questions")
+async def generate_questions(
+    application_id: int = Form(...)
+):
+    try:
+        app_result = supabase.table("applications").select("*").eq(
+            "id",
+            application_id
+        ).execute()
+
+        if not app_result.data:
+            return {"error": "Application not found"}
+
+        application = app_result.data[0]
+
+        job_result = supabase.table("jobs").select("*").eq(
+            "id",
+            application["job_id"]
+        ).execute()
+
+        if not job_result.data:
+            return {"error": "Job not found"}
+
+        job_description = job_result.data[0]["description"]
+
+        resume_context = f"""
+Candidate Email: {application["seeker_email"]}
+Matched Skills: {application.get("matched_skills")}
+Missing Skills: {application.get("missing_skills")}
+AI Feedback: {application.get("ai_feedback")}
+Candidate Summary: {application.get("candidate_summary")}
+"""
+
+        questions = generate_interview_questions(
+            resume_context,
+            job_description
         )
 
-        if job:
-            result.append({
-                "job_title": job["title"],
-                "status": app_item["status"]
-            })
+        return {
+            "application_id": application_id,
+            "questions": questions
+        }
 
-    return {"applications": result}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/analytics")
+async def analytics():
+    try:
+        jobs_result = supabase.table("jobs").select("*").execute()
+        apps_result = supabase.table("applications").select("*").execute()
+
+        applications = apps_result.data
+
+        total_jobs = len(jobs_result.data)
+        total_applications = len(applications)
+
+        selected = len([
+            app for app in applications
+            if app["status"] == "Selected"
+        ])
+
+        rejected = len([
+            app for app in applications
+            if app["status"] == "Rejected"
+        ])
+
+        on_hold = len([
+            app for app in applications
+            if app["status"] == "On Hold"
+        ])
+
+        under_review = len([
+            app for app in applications
+            if app["status"] == "Under Review"
+        ])
+
+        avg_ai_score = 0
+
+        if total_applications > 0:
+            avg_ai_score = sum([
+                app.get("resume_score") or 0
+                for app in applications
+            ]) / total_applications
+
+        return {
+            "total_jobs": total_jobs,
+            "total_applications": total_applications,
+            "selected": selected,
+            "rejected": rejected,
+            "on_hold": on_hold,
+            "under_review": under_review,
+            "average_ai_score": round(avg_ai_score, 2)
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
+    
+@app.post("/recruiter-copilot")
+async def recruiter_copilot(
+    question: str = Form(...),
+    recruiter_email: str = Form(...)
+):
+    try:
+        apps_result = supabase.table("applications").select("*").execute()
+        jobs_result = supabase.table("jobs").select("*").execute()
+
+        jobs = jobs_result.data
+        applications = apps_result.data
+
+        recruiter_data = []
+
+        for app_item in applications:
+            job = next(
+                (j for j in jobs if j["id"] == app_item["job_id"]),
+                None
+            )
+
+            if job and job["posted_by"] == recruiter_email:
+                recruiter_data.append({
+                    "candidate": app_item["seeker_email"],
+                    "job_title": job["title"],
+                    "ai_score": app_item["resume_score"],
+                    "recruiter_score": app_item["interview_score"],
+                    "final_score": app_item["final_score"],
+                    "status": app_item["status"],
+                    "matched_skills": app_item.get("matched_skills"),
+                    "missing_skills": app_item.get("missing_skills"),
+                    "ai_feedback": app_item.get("ai_feedback"),
+                    "candidate_summary": app_item.get("candidate_summary")
+                })
+
+        answer = recruiter_copilot_answer(
+            question,
+            recruiter_data
+        )
+
+        return {
+            "answer": answer
+        }
+
+    except Exception as e:
+        return {
+            "error": str(e)
+        }    
