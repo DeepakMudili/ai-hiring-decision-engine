@@ -253,7 +253,7 @@ def recruiter_copilot_answer(question, context):
     prompt = f"""
 You are an AI Recruiter Copilot.
 
-Answer the recruiter's question using only the provided hiring data.
+Answer the recruiter's question using only the provided hiring data. you can do give some basic answers from your data
 
 Be clear, short, and professional.
 
@@ -269,4 +269,4 @@ Hiring Data:
         return response.content
 
     except Exception:
-        return "AI Recruiter Copilot is unavailable right now."
+        return "AI Recruiter Copilot is currently  unavailable right now."
